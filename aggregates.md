@@ -2,7 +2,7 @@
 
 Corpus root: `/home/user/crewAI-examples`
 
-**Repo-unit note.** The spec defines `repo` as the first path component under the corpus root. This corpus is a single repository whose first level is category folders (`crews/`, `flows/`, `integrations/`, `notebooks/`), so that reading yields four rows and no usable dialect table. `repo` is therefore the project unit (nearest directory holding a manifest or `.py` files, capped at depth 3); `repo_top` on every row preserves the literal reading.
+**Repo-unit note.** The spec defines `repo` as the first path component under the corpus root. Here the first level is `crews/`, `flows/`, `integrations/`, `notebooks/` — 4 component(s) covering 31 actual projects, so the literal reading would collapse the dialect table. `repo` is therefore the project unit (nearest directory holding a manifest or code, capped at depth 3); `repo_top` on every row preserves the literal reading.
 
 ## 1. Totals
 
@@ -260,9 +260,9 @@ All kinds:
 
 **dialect_only repos (spec definition — config/manifest signal but zero `Agent(...)` sites): 0 of 31 (0.0%)**
 
-None. Every repo carrying `config/agents.yaml` also constructs `Agent(...)` in Python — the YAML dialect in this corpus is always *paired* with a `config=self.agents_config[...]` call site, never a replacement for one. The flag as specified therefore finds nothing here.
+None. All 17 repo(s) carrying `config/agents.yaml` also construct `Agent(...)` in Python — the YAML dialect here is always *paired* with a `config=` call site, never a replacement for one. The flag as specified therefore finds nothing in this corpus.
 
-**Broader flag — repos an AST-only pass sees nothing in, for any reason: 7 of 31 (22.6%)**. This is the population `dialect_only` was meant to catch, and in this corpus the cause is notebooks, not config dialects:
+**Broader flag — repos an AST-only pass sees nothing in, for any reason: 7 of 31 (22.6%)**. This is the population `dialect_only` was meant to catch; here it is dominated by notebook-only:
 
 - `crews/industry-agents` — notebook-only (0 .py, 1 .ipynb, 1 of them mentioning crewai)
 - `flows/content_creator_flow` — no code at all (0 .py, 0 .ipynb, 0 of them mentioning crewai)

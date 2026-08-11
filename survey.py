@@ -33,6 +33,7 @@ KNOWN_AGENT_KWARGS = {
 
 # Markers that make a directory a project unit rather than a category folder.
 UNIT_MARKERS = ("pyproject.toml", "requirements.txt", "setup.py", "Pipfile", "poetry.lock")
+SINGLE_UNIT = "."  # the corpus root is itself one packaged project
 
 SCOPE_BARRIERS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef,
                   ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
@@ -75,6 +76,12 @@ def discover_repo_units(root, max_depth=3):
     otherwise descend into its children, capped at max_depth. `repo_top` on every
     row preserves the literal first-component reading.
     """
+    # A root that is itself a packaged project is one unit, not a corpus. Splitting
+    # such a repo on its top-level directories invents "repos" out of tests/, ui/,
+    # api/ and then reports most of them as invisible, which is an artefact.
+    if any(m in _files(root) for m in UNIT_MARKERS):
+        return [SINGLE_UNIT]
+
     units = []
 
     def visit(rel, depth):
@@ -95,6 +102,8 @@ def discover_repo_units(root, max_depth=3):
 
 
 def repo_for(relpath, units):
+    if units == [SINGLE_UNIT]:
+        return SINGLE_UNIT
     for u in units:
         if relpath == u or relpath.startswith(u + os.sep):
             return u
@@ -640,12 +649,24 @@ def write_aggregates(rows, dialects, stats, root, units, path="aggregates.md"):
     o.append("")
     o.append(f"Corpus root: `{root}`")
     o.append("")
-    o.append("**Repo-unit note.** The spec defines `repo` as the first path component under "
-             "the corpus root. This corpus is a single repository whose first level is "
-             "category folders (`crews/`, `flows/`, `integrations/`, `notebooks/`), so that "
-             "reading yields four rows and no usable dialect table. `repo` is therefore the "
-             "project unit (nearest directory holding a manifest or `.py` files, capped at "
-             "depth 3); `repo_top` on every row preserves the literal reading.")
+    if units == [SINGLE_UNIT]:
+        o.append("**Repo-unit note.** The corpus root carries a packaging manifest of its "
+                 "own, so it is **one project, not a corpus of repos**. Splitting it on "
+                 "top-level directories would invent repos out of `tests/`, `ui/` and the "
+                 "like and then report most of them as having no agents, which is an "
+                 "artefact of the split rather than a fact about the code. Table 11 "
+                 "therefore has a single row. Per-directory detail is recoverable from the "
+                 "`file` field in `agent_sites.jsonl`.")
+    else:
+        tops = sorted({u.split(os.sep)[0] for u in units})
+        o.append("**Repo-unit note.** The spec defines `repo` as the first path component "
+                 "under the corpus root. Here the first level is "
+                 + ", ".join(f"`{t}/`" for t in tops[:6])
+                 + (", ..." if len(tops) > 6 else "")
+                 + f" — {len(tops)} component(s) covering {len(units)} actual projects, so "
+                 "the literal reading would collapse the dialect table. `repo` is therefore "
+                 "the project unit (nearest directory holding a manifest or code, capped at "
+                 "depth 3); `repo_top` on every row preserves the literal reading.")
     o.append("")
 
     # 1
@@ -768,7 +789,8 @@ def write_aggregates(rows, dialects, stats, root, units, path="aggregates.md"):
     o.append("All reference-valued kwargs on `Agent(...)`:")
     o.append("")
     table(o, ["ref_scope", "Count", "% of refs"],
-          [[k, n, pct(n, tot)] for k, n in allref.most_common()])
+          [[k, n, pct(n, tot)] for k, n in allref.most_common()]
+          or [["(none — no kwarg on any Agent is a bare Name or Attribute)", 0, "0.0%"]])
     llmref = Counter()
     for r in agents:
         kw = r["kwargs"].get("llm")
@@ -925,30 +947,43 @@ def write_aggregates(rows, dialects, stats, root, units, path="aggregates.md"):
             o.append(f"- `{r}` — {', '.join(why) or 'no signal'} "
                      f"({d['py_file_count']} .py files)")
     else:
-        o.append("None. Every repo carrying `config/agents.yaml` also constructs `Agent(...)` "
-                 "in Python — the YAML dialect in this corpus is always *paired* with a "
-                 "`config=self.agents_config[...]` call site, never a replacement for one. "
-                 "The flag as specified therefore finds nothing here.")
+        paired = [d for d in dialects if d["has_agents_yaml"] and d["agent_site_count"]]
+        o.append(f"None. All {len(paired)} repo(s) carrying `config/agents.yaml` also "
+                 f"construct `Agent(...)` in Python — the YAML dialect here is always "
+                 f"*paired* with a `config=` call site, never a replacement for one. The "
+                 f"flag as specified therefore finds nothing in this corpus.")
     o.append("")
 
     inv = [d for d in dialects if d["invisible_to_ast"]]
+
+    def cause_of(d):
+        if d["notebook_only"]:
+            return "notebook-only"
+        if d["py_file_count"] == 0 and d["ipynb_file_count"] == 0:
+            return "no code at all"
+        return "py files but no Agent sites"
+
+    causes = Counter(cause_of(d) for d in inv)
+    lead = (f"dominated by {causes.most_common(1)[0][0]}" if causes else "empty")
     o.append(f"**Broader flag — repos an AST-only pass sees nothing in, for any reason: "
              f"{len(inv)} of {len(dialects)} ({pct(len(inv), len(dialects))})**. This is "
-             f"the population `dialect_only` was meant to catch, and in this corpus the "
-             f"cause is notebooks, not config dialects:")
+             f"the population `dialect_only` was meant to catch; here it is {lead}:")
     o.append("")
     for d in sorted(inv, key=lambda x: x["repo"]):
-        cause = ("notebook-only" if d["notebook_only"] else
-                 "no code at all" if d["py_file_count"] == 0 and d["ipynb_file_count"] == 0
-                 else "py files but no Agent sites")
-        o.append(f"- `{d['repo']}` — {cause} "
+        o.append(f"- `{d['repo']}` — {cause_of(d)} "
                  f"({d['py_file_count']} .py, {d['ipynb_file_count']} .ipynb, "
                  f"{d['ipynb_mentioning_crewai']} of them mentioning crewai)")
     o.append("")
     nb = [d for d in dialects if d["notebook_only"]]
-    o.append(f"Notebook-only repos: **{len(nb)} of {len(dialects)} "
-             f"({pct(len(nb), len(dialects))})**. `.ipynb` is outside the `*.py` glob the "
-             f"spec defines, so none of their agent sites appear anywhere in Passes A or B.")
+    if nb:
+        o.append(f"Notebook-only repos: **{len(nb)} of {len(dialects)} "
+                 f"({pct(len(nb), len(dialects))})**. `.ipynb` is outside the `*.py` glob "
+                 f"the spec defines, so none of their agent sites appear anywhere in "
+                 f"Passes A or B.")
+    else:
+        total_nb = sum(d["ipynb_file_count"] for d in dialects)
+        o.append(f"No notebook-only repos ({total_nb} `.ipynb` files in the corpus). The "
+                 f"`*.py`-glob blind spot does not bite here.")
     o.append("")
 
     # 12
