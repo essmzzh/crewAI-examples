@@ -775,20 +775,47 @@ def write_aggregates(rows, dialects, stats, root, units, path="aggregates.md"):
             flags.append("**literal placeholder**")
         rows5.append([f"`{v}`", n, ", ".join(flags)])
     table(o, ["Model string", "Count", "Flags"], rows5 or [["(none)", 0, ""]])
-    # also surface model strings hiding inside LLM(...) calls
-    modelstrings = Counter()
+    # Model strings hide in three other places, all of which Table 5's Agent-only
+    # `llm=` view misses: model kwargs on LLM(...), model kwargs nested inside a
+    # constructor call, and llm-ish kwargs on Crew/Task — `manager_llm="GPT-4o"`
+    # is a bare model string that never touches an Agent.
+    LLM_KWARGS = ("llm", "manager_llm", "function_calling_llm", "planning_llm",
+                  "model", "model_name")
+    modelstrings, offsite = Counter(), Counter()
     for r in rows:
-        if r["kind"] == "llm":
-            mv = r["kwargs"].get("model") or r["kwargs"].get("model_name")
-            if mv and mv.get("constant_value"):
-                modelstrings[mv["constant_value"]] += 1
-    for r in agents:
-        kw = r["kwargs"].get("llm")
-        if kw and kw["node_type"] == "Call":
-            m = re.search(r"model(?:_name)?=['\"]([^'\"]+)['\"]", kw["unparsed"])
-            if m:
-                modelstrings[m.group(1)] += 1
-    o.append("Model strings found on `LLM(...)`/`llm=Call(...)` sites (not `llm=` constants):")
+        for kwname, kw in r["kwargs"].items():
+            if kwname not in LLM_KWARGS:
+                continue
+            if kw.get("constant_value"):
+                if r["kind"] == "agent" and kwname == "llm":
+                    continue  # already in the table above
+                offsite[(r["kind"], kwname, kw["constant_value"])] += 1
+            if kwname in ("model", "model_name") and kw.get("constant_value"):
+                modelstrings[kw["constant_value"]] += 1
+            elif kw["node_type"] == "Call":
+                m = re.search(r"model(?:_name|_str)?=['\"]([^'\"]+)['\"]", kw["unparsed"])
+                if m:
+                    modelstrings[m.group(1)] += 1
+        # and inside whatever a reference resolved to
+        for kw in r["kwargs"].values():
+            if kw.get("ref_target_type") == "Call" and kw.get("ref_target_unparsed"):
+                m = re.search(r"model(?:_name|_str)?=['\"]([^'\"]+)['\"]",
+                              kw["ref_target_unparsed"])
+                if m:
+                    modelstrings[m.group(1)] += 1
+    if offsite:
+        o.append("**Constant model strings on kwargs other than `Agent(llm=)`** — these "
+                 "are invisible to the table above:")
+        o.append("")
+        table(o, ["Kind", "Kwarg", "Value", "Count", "Flags"],
+              [[k, kwn, f"`{v}`", n,
+                ", ".join(([ "multi-slash"] if v.count("/") > 1 else [])
+                          + (["**literal placeholder**"] if v == "provider/model-id" else [])
+                          + (["**not lowercase — LiteLLM ids are lowercase**"]
+                             if v != v.lower() else []))]
+               for (k, kwn, v), n in offsite.most_common()])
+    o.append("Model strings found inside constructor calls (`LLM(...)`, `llm=Call(...)`, "
+             "or whatever a reference resolved to):")
     o.append("")
     rows5b = []
     for v, n in modelstrings.most_common():
@@ -797,6 +824,10 @@ def write_aggregates(rows, dialects, stats, root, units, path="aggregates.md"):
             flags.append("multi-slash")
         if v == "provider/model-id":
             flags.append("**literal placeholder**")
+        if v.endswith("/") or v.startswith("/"):
+            flags.append("**partial — concatenated at runtime, not a real id**")
+        if v != v.lower():
+            flags.append("not lowercase")
         rows5b.append([f"`{v}`", n, ", ".join(flags)])
     table(o, ["Model string", "Count", "Flags"], rows5b or [["(none)", 0, ""]])
 

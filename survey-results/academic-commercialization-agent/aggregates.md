@@ -58,7 +58,7 @@ Constructors reached **indirectly** (the `llm=`/`function_calling_llm=` referenc
 |---|---|---|
 | (none) | 0 |  |
 
-Model strings found on `LLM(...)`/`llm=Call(...)` sites (not `llm=` constants):
+Model strings found inside constructor calls (`LLM(...)`, `llm=Call(...)`, or whatever a reference resolved to):
 
 | Model string | Count | Flags |
 |---|---|---|

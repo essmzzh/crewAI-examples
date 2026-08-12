@@ -1,6 +1,6 @@
 # CrewAI corpus survey — aggregates
 
-Corpus root: `/workspace/essmzzh/ai-crewai-multi-agent`
+Corpus root: `/workspace/essmzzh/PurpleCrew`
 
 **Repo-unit note.** The corpus root carries a packaging manifest of its own, so it is **one project, not a corpus of repos**. Splitting it on top-level directories would invent repos out of its source, test and asset folders and then report most of them as having no agents, which is an artefact of the split rather than a fact about the code. Table 11 therefore has a single row. Per-directory detail is recoverable from the `file` field in `agent_sites.jsonl`.
 
@@ -10,14 +10,14 @@ Corpus root: `/workspace/essmzzh/ai-crewai-multi-agent`
 |---|---|
 | Repo units scanned | 1 |
 | Top-level categories | 1 |
-| .py files scanned | 3 |
+| .py files scanned | 19 |
 | .ipynb files present (not parsed — see narrative) | 0 |
 | Parse failures | 0 |
 | Read failures | 0 |
-| Files importing crewai symbols | 1 |
-| Agent sites | 2 |
-| Crew sites | 1 |
-| Task sites | 2 |
+| Files importing crewai symbols | 3 |
+| Agent sites | 16 |
+| Crew sites | 3 |
+| Task sites | 29 |
 | LLM sites | 0 |
 | Agent sites in test/example paths | 0 |
 
@@ -27,9 +27,10 @@ No parse failures.
 
 | Kwarg | Count | % of agents | Anticipated by spec |
 |---|---|---|---|
-| config | 2 | 100.0% | yes |
-| llm | 2 | 100.0% | yes |
-| tools | 2 | 100.0% | yes |
+| config | 16 | 100.0% | yes |
+| allow_delegation | 15 | 93.8% | yes |
+| tools | 9 | 56.2% | yes |
+| verbose | 6 | 37.5% | yes |
 
 Agents constructed with `**kwargs` unpacking: 0 (0.0%). Agents with positional args: 0 (0.0%).
 
@@ -37,7 +38,7 @@ Agents constructed with `**kwargs` unpacking: 0 (0.0%). Agents with positional a
 
 | llm_shape | Count | % of agents |
 |---|---|---|
-| attribute | 2 | 100.0% |
+| absent | 16 | 100.0% |
 
 ## 4. `llm_call_callee` distribution
 
@@ -47,7 +48,7 @@ Constructors reached **indirectly** (the `llm=`/`function_calling_llm=` referenc
 
 | Resolved callee | Count |
 |---|---|
-| ChatOpenAI | 2 |
+| (none) | 0 |
 
 ## 5. `llm_constant` values
 
@@ -55,11 +56,17 @@ Constructors reached **indirectly** (the `llm=`/`function_calling_llm=` referenc
 |---|---|---|
 | (none) | 0 |  |
 
+**Constant model strings on kwargs other than `Agent(llm=)`** — these are invisible to the table above:
+
+| Kind | Kwarg | Value | Count | Flags |
+|---|---|---|---|---|
+| crew | manager_llm | `GPT-4o` | 2 | **not lowercase — LiteLLM ids are lowercase** |
+
 Model strings found inside constructor calls (`LLM(...)`, `llm=Call(...)`, or whatever a reference resolved to):
 
 | Model string | Count | Flags |
 |---|---|---|
-| `gpt-4-turbo` | 2 |  |
+| (none) | 0 |  |
 
 ## 6. `ref_scope` distribution
 
@@ -67,13 +74,13 @@ All reference-valued kwargs on `Agent(...)`:
 
 | ref_scope | Count | % of refs |
 |---|---|---|
-| self_attr | 2 | 100.0% |
+| (none — no kwarg on any Agent is a bare Name or Attribute) | 0 | 0.0% |
 
 `llm=` alone:
 
 | ref_scope | Count | % of llm refs |
 |---|---|---|
-| self_attr | 2 | 100.0% |
+| (none) | 0 | 0.0% |
 
 `tools=` alone:
 
@@ -85,67 +92,76 @@ Where `self.<attr>` references are actually bound:
 
 | Binding site | Count |
 |---|---|
-| __init__ | 2 |
+| (none) | 0 |
 
-**Locally resolvable** (local / class_attr / module / self_attr): 2 of 2 (100.0%).
+**Locally resolvable** (local / class_attr / module / self_attr): 0 of 0 (0.0%).
 
 ## 7. `tools_element_types` (summed across agents)
 
 | Element node type | Count |
 |---|---|
-| Attribute | 4 |
+| Attribute | 8 |
+| Name | 5 |
 
 `tools_shape`:
 
 | tools_shape | Count | % of agents |
 |---|---|---|
-| list | 2 | 100.0% |
+| list | 9 | 56.2% |
+| absent | 7 | 43.8% |
 
 Reference scope of the **elements** inside `tools=[...]` (beyond the spec's kwarg-level Pass B, but it is what decides whether a tools list resolves):
 
 | Element ref_scope | Count |
 |---|---|
-| namespace_attr | 4 |
+| self_attr | 8 |
+| module | 5 |
 
 Most common tool expressions:
 
 | Element | Count |
 |---|---|
-| `SECTools.search_10k` | 2 |
-| `SECTools.search_10q` | 2 |
+| `self.serper_tool` | 4 |
+| `sentinel_tool` | 2 |
+| `self.exctractor_tool` | 2 |
+| `matrix_tool` | 1 |
+| `analytic_rule_tool` | 1 |
+| `git_sentinel_tool` | 1 |
+| `self.pdf_search_tool` | 1 |
+| `self.caldera_tool` | 1 |
 
 ## 8. Construction surface
 
 | Surface | Count | % of agents |
 |---|---|---|
-| decorated method (@agent) in @CrewBase class | 2 | 100.0% |
+| decorated method (@agent) in @CrewBase class | 16 | 100.0% |
 
 Cross-tab of the raw signals:
 
 | in class | in func | func decorated | class decorated | in return | in list | Count |
 |---|---|---|---|---|---|---|
-| True | True | True | True | True | False | 2 |
+| True | True | True | True | True | False | 16 |
 
 Decorators observed on the enclosing function / class:
 
 | Decorator | Scope | Count |
 |---|---|---|
-| `agent` | func | 2 |
-| `CrewBase` | class | 2 |
+| `agent` | func | 16 |
+| `CrewBase` | class | 16 |
 
 ## 9. Import paths observed
 
 | Import path (Agent) | Count |
 |---|---|
-| `crewai` | 2 |
+| `crewai` | 16 |
 
 All kinds:
 
 | Kind | Import path | Count |
 |---|---|---|
-| agent | `crewai` | 2 |
-| task | `crewai` | 2 |
-| crew | `crewai` | 1 |
+| task | `crewai` | 29 |
+| agent | `crewai` | 16 |
+| crew | `crewai` | 3 |
 
 ## 10. `identity_fields_present`
 
@@ -153,17 +169,17 @@ All kinds:
 |---|---|---|
 | All three (role, goal, backstory) | 0 | 0.0% |
 | Some (1-2) | 0 | 0.0% |
-| None | 2 | 100.0% |
+| None | 16 | 100.0% |
 
 | Exact combination | Count |
 |---|---|
-| (none) | 2 |
+| (none) | 16 |
 
 ## 11. Repo dialects
 
 | Repo | py | ipynb | agent sites | agents.yaml | tasks.yaml | crew.json(c) | agents/*.jsonc | manifest crewai | pin | type | extras | crewai import | dialect_only | invisible |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| . | 3 | 0 | 2 | Y | Y |  |  | Y | ==0.30.11 |  |  | Y |  |  |
+| . | 19 | 0 | 16 | Y | Y |  |  | Y | >=0.100.1 |  | tools | Y |  |  |
 
 **dialect_only repos (spec definition — config/manifest signal but zero `Agent(...)` sites): 0 of 1 (0.0%)**
 
@@ -186,38 +202,51 @@ The inverse is the more interesting result — spec-anticipated kwargs that **ne
 
 | Anticipated kwarg | Occurrences |
 |---|---|
-| `allow_delegation` | 0 |
 | `apps` | 0 |
 | `backstory` | 0 |
 | `cache` | 0 |
 | `function_calling_llm` | 0 |
 | `goal` | 0 |
+| `llm` | 0 |
 | `max_iter` | 0 |
 | `mcps` | 0 |
 | `memory` | 0 |
 | `role` | 0 |
 | `step_callback` | 0 |
-| `verbose` | 0 |
 
-12 of 15 anticipated kwargs are unused; 3 distinct kwargs carry the entire corpus.
+11 of 15 anticipated kwargs are unused; 4 distinct kwargs carry the entire corpus.
 
 ## Appendix — kwargs on the other kinds
 
-### `Crew(...)` — 1 sites
+### `Crew(...)` — 3 sites
 
 | Kwarg | Count | % of crews |
 |---|---|---|
-| agents | 1 | 100.0% |
-| process | 1 | 100.0% |
-| tasks | 1 | 100.0% |
-| verbose | 1 | 100.0% |
+| agents | 3 | 100.0% |
+| manager_agent | 3 | 100.0% |
+| planning | 3 | 100.0% |
+| process | 3 | 100.0% |
+| tasks | 3 | 100.0% |
+| manager_llm | 2 | 66.7% |
+| verbose | 2 | 66.7% |
 
-### `Task(...)` — 2 sites
+### `Task(...)` — 29 sites
 
 | Kwarg | Count | % of tasks |
 |---|---|---|
-| agent | 2 | 100.0% |
-| config | 2 | 100.0% |
+| config | 27 | 93.1% |
+| agent | 25 | 86.2% |
+| context | 23 | 79.3% |
+| tools | 12 | 41.4% |
+| max_retries | 4 | 13.8% |
+| tool | 3 | 10.3% |
+| verbose | 2 | 6.9% |
+| output_file | 2 | 6.9% |
+| output_format | 2 | 6.9% |
+| description | 2 | 6.9% |
+| expected_output | 2 | 6.9% |
+| name | 2 | 6.9% |
+| input | 1 | 3.4% |
 
 ### `LLM(...)` — 0 sites
 

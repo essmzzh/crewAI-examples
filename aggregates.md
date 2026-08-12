@@ -70,11 +70,21 @@ Constructors reached **indirectly** (the `llm=`/`function_calling_llm=` referenc
 |---|---|---|
 | (none) | 0 |  |
 
-Model strings found on `LLM(...)`/`llm=Call(...)` sites (not `llm=` constants):
+**Constant model strings on kwargs other than `Agent(llm=)`** — these are invisible to the table above:
+
+| Kind | Kwarg | Value | Count | Flags |
+|---|---|---|---|---|
+| llm | model | `gpt-4o` | 2 |  |
+
+Model strings found inside constructor calls (`LLM(...)`, `llm=Call(...)`, or whatever a reference resolved to):
 
 | Model string | Count | Flags |
 |---|---|---|
-| `gpt-4o` | 2 |  |
+| `gpt-4o` | 9 |  |
+| `llama3.1` | 4 |  |
+| `nvidia_nim/` | 4 | **partial — concatenated at runtime, not a real id** |
+| `gpt-3.5-turbo` | 2 |  |
+| `gpt-4` | 1 |  |
 
 ## 6. `ref_scope` distribution
 
