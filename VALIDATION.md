@@ -51,6 +51,52 @@ record, not about what was found.
 
 ---
 
+## 0. Prompt values are silently truncated at 300 characters
+
+Found after the first pass. Every emitted prompt `value` is hard-cut at exactly
+300 characters — no ellipsis, no flag, cutting mid-word and preserving the
+trailing space, which is the signature of a `[:300]` slice rather than display
+abbreviation.
+
+Verified against source YAML: the `screenplay_writer` `scorer.goal` is 1,383
+characters; the emitted value is its first 300, and the tail carrying the actual
+scoring rubric ("7-9: Good... 10: Excellent...") is gone.
+
+Blast radius across the four fixtures' `config/agents.yaml` files:
+
+| Corpus | Prompts over 300 chars | Share |
+|---|---|---|
+| C1 crewAI-examples | 1 of 24 | 4% |
+| C2 academic-commercialization | 6 of 18 | 33% |
+| C3 ai-crewai-multi-agent | 0 of 6 | 0% |
+| C4 PurpleCrew | 13 of 51 | 25% |
+| **Total** | **20 of 99** | **20%** |
+
+Worst losses:
+
+| Prompt | True length | Lost |
+|---|---|---|
+| C2 `commercialization_scorer.backstory` | 22,224 | 21,924 (**99%**) |
+| C2 `report_reviewer.backstory` | 3,748 | 3,448 (92%) |
+| C2 `commercialization_report_writer.backstory` | 1,625 | 1,325 (82%) |
+| C1 `scorer.goal` | 1,383 | 1,083 (78%) |
+| C4 `RedTeamManager.backstory` | 935 | 635 (68%) |
+
+**One in five prompts loses content, and the largest loses 99% of it.**
+
+The compounding problem: `version` is a content hash. If it hashes the emitted
+(truncated) value, then **every edit after character 300 is invisible to
+versioning** — precisely the long system prompts most likely to be iterated on.
+For `commercialization_scorer.backstory`, 99% of the text could be rewritten
+without the version moving. That is a one-line check: mutate character 301 of a
+prompt and see whether `version` changes.
+
+(If the truncation exists only in this dump and not in the stored record, this
+item is moot — worth confirming before acting on it. Nothing else in the payload
+suggests that; the cuts land at exactly 300 with no marker.)
+
+---
+
 ## 1. Provenance on C1 is wrong, and it breaks the drift check
 
 Every C1 record carries:
@@ -179,8 +225,11 @@ Two other Task-level findings from the survey are likewise unreachable:
 derived classification, and correct refusal on the one genuinely unresolvable
 model. No false positives, no false negatives.
 
-**Emission: three fixes needed before this gates anything.**
+**Emission: four fixes needed before this gates anything.**
 
+0. **Stop truncating prompt values at 300 characters.** 20% of prompts lose
+   content, one of them 99% of it, and content hashing over a truncated value
+   makes drift undetectable on exactly those prompts.
 1. **Stamp provenance from the tree actually scanned.** C1 reports a commit whose
    real content is 5.5× the fixture. This defeats the drift check outright.
 2. **Make `id` unique per record, or document that it is not.** 37 agent records
