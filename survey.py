@@ -22,7 +22,10 @@ from collections import Counter, defaultdict
 TARGETS = {"Agent", "Crew", "Task", "LLM"}
 SKIP_DIRS = {".venv", "venv", "node_modules", "__pycache__", ".git", "site-packages",
              ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
-             ".eggs", "env"}
+             ".eggs", "env",
+             # This script's own output happens to be committed inside corpus 1.
+             # Without this it gets discovered as a 32nd "repo unit".
+             "survey-results"}
 
 # The kwargs the build spec anticipates; anything else lands in Table 12.
 KNOWN_AGENT_KWARGS = {
@@ -522,6 +525,25 @@ def scan_file(path, root, units, stats):
 # Pass C
 # --------------------------------------------------------------------------
 
+def read_text(path):
+    """Decode a manifest without assuming UTF-8. Windows-authored requirements.txt
+    files are often UTF-16; reading those as UTF-8 turns 'crewai' into 'c r e w a i'
+    and every substring check silently returns False."""
+    try:
+        raw = open(path, "rb").read()
+    except OSError:
+        return ""
+    for bom, enc in ((b"\xff\xfe\x00\x00", "utf-32"), (b"\x00\x00\xfe\xff", "utf-32"),
+                     (b"\xff\xfe", "utf-16"), (b"\xfe\xff", "utf-16"),
+                     (b"\xef\xbb\xbf", "utf-8-sig")):
+        if raw.startswith(bom):
+            return raw.decode(enc, errors="replace")
+    # BOM-less UTF-16 still shows as interleaved NULs
+    if raw[:200].count(b"\x00") > len(raw[:200]) // 4:
+        return raw.decode("utf-16", errors="replace")
+    return raw.decode("utf-8", errors="replace")
+
+
 def has_glob(unit_abs, *relparts):
     """Existence check for a path pattern anywhere beneath unit_abs."""
     target = os.path.join(*relparts)
@@ -537,7 +559,7 @@ def has_glob(unit_abs, *relparts):
 def scan_repo_dialect(root, unit, agent_counts, py_counts, import_repos):
     unit_abs = os.path.join(root, unit)
     found = defaultdict(bool)
-    extras, ptype, manifest_crewai = set(), None, False
+    extras, ptype, manifest_crewai, pin = set(), None, False, None
     nb_count, nb_crewai = 0, 0
 
     for dirpath, dirnames, filenames in os.walk(unit_abs):
@@ -564,12 +586,12 @@ def scan_repo_dialect(root, unit, agent_counts, py_counts, import_repos):
             elif fn == "tasks.yaml" and parent_name == "config":
                 found["has_tasks_yaml"] = True
             elif fn in ("pyproject.toml", "requirements.txt", "Pipfile"):
-                try:
-                    text = open(full, "r", encoding="utf-8", errors="replace").read()
-                except OSError:
-                    continue
+                text = read_text(full)
                 if "crewai" in text.lower():
                     manifest_crewai = True
+                m = re.search(r"crewai(?:\[[^\]]*\])?\s*([=><~!]=?[^\"',\s]+)", text)
+                if m and not pin:
+                    pin = m.group(1)
                 for m in re.finditer(r"crewai\s*\[([^\]]*)\]", text):
                     for e in m.group(1).split(","):
                         e = e.strip().strip("\"'")
@@ -590,6 +612,7 @@ def scan_repo_dialect(root, unit, agent_counts, py_counts, import_repos):
         "has_tasks_yaml": bool(found["has_tasks_yaml"]),
         "has_pyproject_crewai": manifest_crewai,
         "pyproject_type": ptype,
+        "crewai_pin": pin,
         "crewai_extras": sorted(extras),
         "has_crewai_import": unit in import_repos,
         "agent_site_count": agent_counts.get(unit, 0),
@@ -652,9 +675,9 @@ def write_aggregates(rows, dialects, stats, root, units, path="aggregates.md"):
     if units == [SINGLE_UNIT]:
         o.append("**Repo-unit note.** The corpus root carries a packaging manifest of its "
                  "own, so it is **one project, not a corpus of repos**. Splitting it on "
-                 "top-level directories would invent repos out of `tests/`, `ui/` and the "
-                 "like and then report most of them as having no agents, which is an "
-                 "artefact of the split rather than a fact about the code. Table 11 "
+                 "top-level directories would invent repos out of its source, test and "
+                 "asset folders and then report most of them as having no agents, which "
+                 "is an artefact of the split rather than a fact about the code. Table 11 "
                  "therefore has a single row. Per-directory detail is recoverable from the "
                  "`file` field in `agent_sites.jsonl`.")
     else:
@@ -920,13 +943,14 @@ def write_aggregates(rows, dialects, stats, root, units, path="aggregates.md"):
     o.append("## 11. Repo dialects")
     o.append("")
     table(o, ["Repo", "py", "ipynb", "agent sites", "agents.yaml", "tasks.yaml",
-              "crew.json(c)", "agents/*.jsonc", "manifest crewai", "type", "extras",
+              "crew.json(c)", "agents/*.jsonc", "manifest crewai", "pin", "type", "extras",
               "crewai import", "dialect_only", "invisible"],
           [[d["repo"], d["py_file_count"], d["ipynb_file_count"], d["agent_site_count"],
             "Y" if d["has_agents_yaml"] else "", "Y" if d["has_tasks_yaml"] else "",
             "Y" if (d["has_crew_json"] or d["has_crew_jsonc"]) else "",
             "Y" if d["has_agents_jsonc_dir"] else "",
-            "Y" if d["has_pyproject_crewai"] else "", d["pyproject_type"] or "",
+            "Y" if d["has_pyproject_crewai"] else "", d["crewai_pin"] or "",
+            d["pyproject_type"] or "",
             ",".join(d["crewai_extras"]), "Y" if d["has_crewai_import"] else "",
             "**YES**" if d["dialect_only"] else "",
             "**YES**" if d["invisible_to_ast"] else ""]

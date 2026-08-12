@@ -224,39 +224,39 @@ All kinds:
 
 ## 11. Repo dialects
 
-| Repo | py | ipynb | agent sites | agents.yaml | tasks.yaml | crew.json(c) | agents/*.jsonc | manifest crewai | type | extras | crewai import | dialect_only | invisible |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| crews/game-builder-crew | 3 | 0 | 3 | Y | Y |  |  | Y |  |  | Y |  |  |
-| crews/industry-agents | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  | **YES** |
-| crews/instagram_post | 6 | 0 | 6 |  |  |  |  | Y |  |  | Y |  |  |
-| crews/job-posting | 3 | 0 | 3 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| crews/landing_page_generator | 8 | 0 | 6 | Y | Y |  |  | Y |  |  | Y |  |  |
-| crews/markdown_validator | 4 | 0 | 1 | Y | Y |  |  | Y |  |  | Y |  |  |
-| crews/marketing_strategy | 3 | 0 | 3 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| crews/match_profile_to_positions | 5 | 0 | 2 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| crews/meta_quest_knowledge | 4 | 0 | 1 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| crews/prep-for-a-meeting | 5 | 0 | 4 |  |  |  |  | Y |  |  | Y |  |  |
-| crews/recruitment | 7 | 0 | 4 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| crews/screenplay_writer | 1 | 0 | 5 | Y | Y |  |  |  |  |  | Y |  |  |
-| crews/starter_template | 3 | 0 | 2 |  |  |  |  |  |  |  | Y |  |  |
-| crews/stock_analysis | 6 | 0 | 4 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| crews/surprise_trip | 5 | 0 | 3 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| crews/trip_planner | 7 | 0 | 4 |  |  |  |  | Y |  |  | Y |  |  |
-| flows/content_creator_flow | 0 | 0 | 0 |  |  |  |  |  |  |  |  |  | **YES** |
-| flows/email_auto_responder_flow | 6 | 0 | 3 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| flows/lead-score-flow | 7 | 0 | 2 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| flows/meeting_assistant_flow | 6 | 0 | 1 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| flows/self_evaluation_loop_flow | 6 | 0 | 2 | Y | Y |  |  | Y |  | tools | Y |  |  |
-| flows/write_a_book_with_flows | 5 | 0 | 4 | Y | Y |  |  | Y | flow | tools | Y |  |  |
-| integrations/CrewAI-LangGraph | 10 | 0 | 3 |  |  |  |  | Y |  |  | Y |  |  |
-| integrations/azure_model | 1 | 0 | 1 |  |  |  |  | Y |  |  | Y |  |  |
-| integrations/nvidia_models/intro | 1 | 0 | 1 |  |  |  |  | Y |  |  | Y |  |  |
-| integrations/nvidia_models/marketing_strategy | 4 | 1 | 3 | Y | Y |  |  | Y |  |  | Y |  |  |
-| notebooks/Coding Assistant | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  | **YES** |
-| notebooks/Flows_101 | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  | **YES** |
-| notebooks/Landing Page Flow | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  | **YES** |
-| notebooks/QA Agent | 0 | 2 | 0 |  |  |  |  |  |  |  |  |  | **YES** |
-| notebooks/Simple QA Crew + Flow | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  | **YES** |
+| Repo | py | ipynb | agent sites | agents.yaml | tasks.yaml | crew.json(c) | agents/*.jsonc | manifest crewai | pin | type | extras | crewai import | dialect_only | invisible |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| crews/game-builder-crew | 3 | 0 | 3 | Y | Y |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| crews/industry-agents | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  |  | **YES** |
+| crews/instagram_post | 6 | 0 | 6 |  |  |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| crews/job-posting | 3 | 0 | 3 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| crews/landing_page_generator | 8 | 0 | 6 | Y | Y |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| crews/markdown_validator | 4 | 0 | 1 | Y | Y |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| crews/marketing_strategy | 3 | 0 | 3 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| crews/match_profile_to_positions | 5 | 0 | 2 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| crews/meta_quest_knowledge | 4 | 0 | 1 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| crews/prep-for-a-meeting | 5 | 0 | 4 |  |  |  |  | Y | ==0.130.0 |  |  | Y |  |  |
+| crews/recruitment | 7 | 0 | 4 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| crews/screenplay_writer | 1 | 0 | 5 | Y | Y |  |  |  |  |  |  | Y |  |  |
+| crews/starter_template | 3 | 0 | 2 |  |  |  |  |  |  |  |  | Y |  |  |
+| crews/stock_analysis | 6 | 0 | 4 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| crews/surprise_trip | 5 | 0 | 3 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| crews/trip_planner | 7 | 0 | 4 |  |  |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| flows/content_creator_flow | 0 | 0 | 0 |  |  |  |  |  |  |  |  |  |  | **YES** |
+| flows/email_auto_responder_flow | 6 | 0 | 3 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| flows/lead-score-flow | 7 | 0 | 2 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| flows/meeting_assistant_flow | 6 | 0 | 1 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| flows/self_evaluation_loop_flow | 6 | 0 | 2 | Y | Y |  |  | Y | >=0.152.0 |  | tools | Y |  |  |
+| flows/write_a_book_with_flows | 5 | 0 | 4 | Y | Y |  |  | Y | >=0.152.0 | flow | tools | Y |  |  |
+| integrations/CrewAI-LangGraph | 10 | 0 | 3 |  |  |  |  | Y | ==0.130.0 |  |  | Y |  |  |
+| integrations/azure_model | 1 | 0 | 1 |  |  |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| integrations/nvidia_models/intro | 1 | 0 | 1 |  |  |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| integrations/nvidia_models/marketing_strategy | 4 | 1 | 3 | Y | Y |  |  | Y | >=0.152.0 |  |  | Y |  |  |
+| notebooks/Coding Assistant | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  |  | **YES** |
+| notebooks/Flows_101 | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  |  | **YES** |
+| notebooks/Landing Page Flow | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  |  | **YES** |
+| notebooks/QA Agent | 0 | 2 | 0 |  |  |  |  |  |  |  |  |  |  | **YES** |
+| notebooks/Simple QA Crew + Flow | 0 | 1 | 0 |  |  |  |  |  |  |  |  |  |  | **YES** |
 
 **dialect_only repos (spec definition — config/manifest signal but zero `Agent(...)` sites): 0 of 31 (0.0%)**
 
