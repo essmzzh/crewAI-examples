@@ -100,12 +100,13 @@ CrewAI agents without ever reading `llm=` or `tools=`.
 
 ---
 
-## 1. The dialect split holds — for LangGraph's own prebuilt API: still 100% raw graph, 0% prebuilt
+## 1. The dialect split, stated precisely
 
-| API | Sites | Share |
+| API | Sites | Share of graph sites |
 |---|---|---|
 | raw graph (`StateGraph`) | 7 | **100%** |
-| prebuilt (`create_react_agent`) | 0 | **0%** |
+| LangGraph prebuilt (`langgraph.prebuilt.create_react_agent`) | 0 | **0%** |
+| same-named, different package (`langchain.agents…create_react_agent`) | 1 | not a graph site |
 
 I flagged the 0% result last run as resting on three repos and wanting a fourth.
 The fourth is by the framework's own authors and still contributes zero
