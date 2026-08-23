@@ -29,9 +29,10 @@ No parse failures.
 | API | Sites | % of graph sites |
 |---|---|---|
 | raw graph (`StateGraph` / `MessageGraph`) | 7 | 100.0% |
-| prebuilt (`create_react_agent`) | 0 | 0.0% |
+| LangGraph prebuilt (`langgraph.prebuilt.create_react_agent`) | 0 | 0.0% |
+| *same-named, different package* (`langchain.agents...create_react_agent`) | 1 | — not a graph site |
 
-This is the LangGraph analog of a config dialect: it decides how much of the ecosystem each detection path covers. A scanner that only recognises `create_react_agent` would see 0.0% of this corpus.
+**Read this carefully.** 0 sites use LangGraph's prebuilt `create_react_agent`, so a detector built only on that path sees 0.0% of this corpus. But that is **not** the same as "no react agents here": 1 site(s) do construct a ReAct agent, via LangChain's identically-named constructor from a different package. It is excluded from the graph-site census because it does not build a graph — but it is a real agent with a real model and tools, and it is listed below rather than left as a footnote.
 
 **Lookalike callees — same name, different package.** These call a name in the target set but the binding does not come from `langgraph.*`, so they are correctly excluded. A name-only matcher would count them as LangGraph sites and be wrong:
 
@@ -99,6 +100,41 @@ Examples (`file:line`):
 | (not a reference — Lambda) | graph_websearch_agent/agent_graph/graph.py:141 | `serper_tool` | `lambda state: get_google_serper(state=state, plan=lambda: ge` |
 | (not a reference — Lambda) | graph_websearch_agent/agent_graph/graph.py:149 | `scraper_tool` | `lambda state: scrape_website(state=state, research=lambda: g` |
 | (not a reference — Lambda) | graph_websearch_agent/agent_graph/graph.py:157 | `final_report` | `lambda state: FinalReportAgent(state=state).invoke(final_res` |
+
+### 3a. What node bodies actually construct
+
+A node target is a *name*; the assets live in the function it names. This censuses the bodies of node targets that resolve to a `def` in the same module — the blind spot a node-target-only inventory has.
+
+| Node body | Count | % of nodes |
+|---|---|---|
+| visible (`def` in the same module) | 13 | 32.5% |
+| not inspectable (imported, lambda, dotted) | 27 | 67.5% |
+
+Constructors called inside those visible node bodies:
+
+| Constructor | Occurrences |
+|---|---|
+| `ChatGoogleGenerativeAI` | 3 |
+| `ChatOpenAI` | 2 |
+| `ToolMessage` | 2 |
+| `AIMessage` | 1 |
+| `UUID` | 1 |
+| `ChatAnthropic` | 1 |
+| `Command` | 1 |
+| `Send` | 1 |
+
+**8 of 40 nodes build something inside their body.** None of it appears anywhere in the graph-site or node-target tables — those record the node's *name*, not what it constructs.
+
+| Node | Site | Builds |
+|---|---|---|
+| `generate_query` | gemini-fullstack-langgraph-quickstart/backend/src/agent/graph.py:272 | `ChatGoogleGenerativeAI` |
+| `reflection` | gemini-fullstack-langgraph-quickstart/backend/src/agent/graph.py:274 | `ChatGoogleGenerativeAI` |
+| `finalize_answer` | gemini-fullstack-langgraph-quickstart/backend/src/agent/graph.py:275 | `AIMessage`, `ChatGoogleGenerativeAI` |
+| `main` | executive-ai-assistant/eaia/cron_graph.py:51 | `UUID` |
+| `update_general` | executive-ai-assistant/eaia/reflection_graphs.py:98 | `ChatOpenAI` |
+| `determine_what_to_update` | executive-ai-assistant/eaia/reflection_graphs.py:187 | `ChatAnthropic`, `ChatOpenAI`, `Command`, `Send` |
+| `bad_tool_name` | executive-ai-assistant/eaia/main/graph.py:171 | `ToolMessage` |
+| `send_cal_invite_node` | executive-ai-assistant/eaia/main/graph.py:173 | `ToolMessage` |
 
 ## 4. Scope distance from `StateGraph` assignment to `add_node`
 

@@ -725,6 +725,20 @@ def scan_file(path, root, units, stats, corpus, cohort):
         }
         if target is not None:
             nrow.update(part_b(target, nfunc, ncls))
+        # A node target that resolves to a def in this module is not opaque: the
+        # assets (LLMs, tools, agents) live in its BODY. Census them, otherwise a
+        # node-target inventory reports a name and misses everything it builds.
+        nrow["node_body_constructs"] = []
+        nrow["node_body_visible"] = False
+        if isinstance(target, ast.Name) and target.id in func_nodes:
+            nrow["node_body_visible"] = True
+            seen = []
+            for sub in ast.walk(func_nodes[target.id]):
+                if isinstance(sub, ast.Call):
+                    cn = callee_name(sub)
+                    if cn and (cn[:1].isupper() or cn.startswith("create_")):
+                        seen.append(cn)
+            nrow["node_body_constructs"] = sorted(set(seen))
         nodes.append(nrow)
 
     return graphs, nodes
@@ -794,12 +808,21 @@ def write_aggregates(graphs, nodes, dialects, stats, label, path="aggregates.md"
     raw = kinds.get("state_graph", 0) + kinds.get("message_graph", 0)
     react = kinds.get("react_agent", 0)
     tot = raw + react
+    la = stats.get("lookalike_sites", [])
     table(o, ["API", "Sites", "% of graph sites"],
           [["raw graph (`StateGraph` / `MessageGraph`)", raw, pct(raw, tot)],
-           ["prebuilt (`create_react_agent`)", react, pct(react, tot)]])
-    o.append("This is the LangGraph analog of a config dialect: it decides how much of "
-             "the ecosystem each detection path covers. A scanner that only recognises "
-             f"`create_react_agent` would see {pct(react, tot)} of this corpus.")
+           ["LangGraph prebuilt (`langgraph.prebuilt.create_react_agent`)", react,
+            pct(react, tot)],
+           ["*same-named, different package* (`langchain.agents...create_react_agent`)",
+            len(la), "— not a graph site"]])
+    o.append(f"**Read this carefully.** {react} sites use LangGraph's prebuilt "
+             f"`create_react_agent`, so a detector built only on that path sees "
+             f"{pct(react, tot)} of this corpus. But that is **not** the same as "
+             f"\"no react agents here\": {len(la)} site(s) do construct a ReAct agent, "
+             f"via LangChain's identically-named constructor from a different package. "
+             f"It is excluded from the graph-site census because it does not build a "
+             f"graph — but it is a real agent with a real model and tools, and it is "
+             f"listed below rather than left as a footnote.")
     o.append("")
 
     la = stats.get("lookalike_sites", [])
@@ -880,6 +903,34 @@ def write_aggregates(graphs, nodes, dialects, stats, label, path="aggregates.md"
              f"{n['corpus']}/{n['file']}:{n['line']}",
              f"`{n['node_name']}`" if n["node_name"] else "—",
              f"`{(n['node_target_unparsed'] or '')[:60]}`") for n in nodes]][:12])
+
+    vis = [n for n in nodes if n.get("node_body_visible")]
+    opaque = [n for n in nodes if not n.get("node_body_visible")]
+    o.append("### 3a. What node bodies actually construct")
+    o.append("")
+    o.append("A node target is a *name*; the assets live in the function it names. "
+             "This censuses the bodies of node targets that resolve to a `def` in the "
+             "same module — the blind spot a node-target-only inventory has.")
+    o.append("")
+    table(o, ["Node body", "Count", "% of nodes"],
+          [["visible (`def` in the same module)", len(vis), pct(len(vis), len(nodes))],
+           ["not inspectable (imported, lambda, dotted)", len(opaque),
+            pct(len(opaque), len(nodes))]])
+    cons = Counter(c for n in vis for c in n["node_body_constructs"])
+    if cons:
+        o.append("Constructors called inside those visible node bodies:")
+        o.append("")
+        table(o, ["Constructor", "Occurrences"],
+              [[f"`{k}`", v] for k, v in cons.most_common(15)])
+        withc = [n for n in vis if n["node_body_constructs"]]
+        o.append(f"**{len(withc)} of {len(nodes)} nodes build something inside their "
+                 f"body.** None of it appears anywhere in the graph-site or node-target "
+                 f"tables — those record the node's *name*, not what it constructs.")
+        o.append("")
+        table(o, ["Node", "Site", "Builds"],
+              [[f"`{n['node_name']}`", f"{n['corpus']}/{n['file']}:{n['line']}",
+                ", ".join(f"`{c}`" for c in n["node_body_constructs"][:5])]
+               for n in withc[:10]])
 
     # 4 scope distance
     o.append("## 4. Scope distance from `StateGraph` assignment to `add_node`")
