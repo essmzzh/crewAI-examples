@@ -1,178 +1,152 @@
-# Survey v2 — all five corpora in one run
+# Survey v2 — all six corpora in one run
 
-`survey_v2.py`, one run, five corpora, v2 categories throughout. Four `original`
-(already surveyed under v1) and one `new`: `essmzzh/AITradingCrew` @ `2f974ca`.
+`survey_v2.py`, one run, v2 categories throughout. Four `original` (surveyed
+under v1) and two `new`.
 
-**110 `.py` files, 0 parse failures, 45 agent sites** — 37 original (unchanged
-from v1, so the v2 recategorisation did not disturb discovery) + 8 new.
+**118 `.py` files, 0 parse failures, 50 agent sites** — 37 original (unchanged
+from v1) + 13 new.
 
-| Cohort | Corpus | Units | Agents | Crews | Tasks |
-|---|---|---|---|---|---|
-| original | crewAI-examples (trimmed) | 3 | 13 | 3 | 14 |
-| original | academic-commercialization-agent | 1 | 6 | 1 | 6 |
-| original | ai-crewai-multi-agent | 1 | 2 | 1 | 2 |
-| original | PurpleCrew | 1 | 16 | 3 | 29 |
-| **new** | **AITradingCrew** | 1 | **8** | 3 | 8 |
+| Cohort | Corpus | Author | Units | Agents | Crews | Tasks |
+|---|---|---|---|---|---|---|
+| original | crewAI-examples (trimmed) | crewAI | 3 | 13 | 3 | 14 |
+| original | academic-commercialization-agent | essmzzh | 1 | 6 | 1 | 6 |
+| original | ai-crewai-multi-agent | essmzzh | 1 | 2 | 1 | 2 |
+| original | PurpleCrew | essmzzh | 1 | 16 | 3 | 29 |
+| new | AITradingCrew | essmzzh | 1 | 8 | 3 | 8 |
+| **new** | **crewai-gmail-automation** | **tonykipkemboi** | 1 | **5** | 1 | 5 |
+
+`crewai-gmail-automation` @ `0946e17` is the **first corpus by an independent
+author**. Every previous run carried a caveat that the corpus was single-author;
+this is the first evidence that isn't.
 
 ---
 
-## The headline: reachability by cohort
+## Headline: the clean cohort split from the last run does not survive
 
-| Reachability | new (n=8) | original (n=6) | Total |
+Run 5 (one new repo) reported that the two cohorts shared no reachability
+category — 6/6 original resolved in-module, 8/8 new left the module. Adding a
+second new repo **walks that back**:
+
+| Reachability | new (n=13) | original (n=6) | Total |
 |---|---|---|---|
-| `terminal_constructor` | 0 (0%) | **6 (100%)** | 6 |
-| `imported` | **6 (75%)** | 0 (0%) | 6 |
-| `unresolved_local` | 2 (25%) | 0 (0%) | 2 |
+| `terminal_constructor` | **5 (38%)** | 6 (100%) | 11 |
+| `imported` | 6 (46%) | 0 (0%) | 6 |
+| `unresolved_local` | 2 (15%) | 0 (0%) | 2 |
 | `local` | 0 | 0 | 0 |
 | `argument_passed` | 0 | 0 | 0 |
-| `factory_call` (at agent sites) | 0 | 0 | 0 |
-| `runtime_external` (at agent sites) | 0 | 0 | 0 |
+| `factory_call` (agent sites) | 0 | 0 | 0 |
+| `runtime_external` (agent sites) | 0 | 0 | 0 |
 
-**The two cohorts do not overlap on a single category.** Every original-cohort
-reference resolves to a constructor in the same module. Every new-cohort
-reference leaves the module — 6 through an import, 2 through class inheritance.
-That divergence is the finding, and it is total: 6/6 vs 0/8.
+All 5 of the new repo's references are `terminal_constructor` — the same
+category that was 100% of the original cohort. **The cohort divergence was a
+property of AITradingCrew, not of "new code".** Recorded plainly because I
+called it "total" and "stark" last run on a single corpus, and one more data
+point halved it.
 
-Under v1 this would have read as `module`/`self_attr` ×6 versus `imported` ×6 and
-`unresolved` ×2 — the same numbers, but with no way to see that the originals
-are *done* resolving and the new corpus has *not started*.
-
----
-
-## Change 1 — the Call split, and why the agent-site view is a trap
-
-At agent sites, `ref_call_kind` is 100% `terminal_constructor` (6/6, all
-original). `factory_call` is **zero**.
-
-That is misleading, and v2 needed one addition beyond the spec to show why: a
-**binding census** over every module-level and class-body binding whose RHS is a
-call — the population a reference could resolve *to*, rather than the ones it
-happens to reach inside one module.
-
-| call_kind | new (n=18) | original (n=29) | Total |
-|---|---|---|---|
-| `terminal_constructor` | 8 (44%) | 24 (83%) | 32 |
-| `call_unknown` | 5 (28%) | 5 (17%) | 10 |
-| **`factory_call`** | **5 (28%)** | **0 (0%)** | 5 |
-
-Every factory in the corpus is in the new repo, and all five are invisible from
-the agent sites because they sit one import away.
-
-Spot-checks, per the done-when (`file:line`, one per bucket):
-
-| Bucket | Site | Binds | RHS | Basis |
-|---|---|---|---|---|
-| `factory_call` | `AITradingCrew/ai_trading_crew/config.py:150` | `DEFAULT_STOCKTWITS_LLM` | `create_default_llm('OPENROUTER_API_KEY', …)` | matches a `def` in this module |
-| `terminal_constructor` | `crewAI-examples/crews/stock_analysis/src/stock_analysis/crew.py:23` | `llm` (kwarg) | `Ollama(model='llama3.1')` | imported from `langchain.llms`, class by PEP 8 naming |
-| `call_unknown` | `crewAI-examples/crews/screenplay_writer/screenplay_writer.py:10` | `current_dir` | `Path.cwd()` | callee neither defined nor imported in this module |
-
-Two classification rules worth stating, both chosen to avoid inflating
-`factory_call`:
-
-- `factory_call` is reserved for the spec's definition — a callee matching a
-  `def` in *this* module. An imported function-shaped callee is `call_unknown`
-  with the evidence recorded ("latent factory"), never a factory.
-- An imported **CamelCase** callee is `terminal_constructor` on PEP 8 convention
-  *plus* observed import provenance. `Ollama` from `langchain.llms` is evidence,
-  not a guess — the import statement names the origin. My first pass called these
-  `call_unknown`, which made the original cohort look unreachable when it is in
-  fact the best case in the corpus.
+What remains true: **`imported` and `unresolved_local` are still exclusively
+new-cohort** (8 of 8, all AITradingCrew). Cross-module resolution is still a
+capability only the new cohort demands — but it is now demanded by one repo out
+of six, not by "the new cohort".
 
 ---
 
-## Where the factories terminate — the prioritisation answer
+## The new repo restores a shape the trim deleted
 
-Following each `factory_call` into its `def` in the same module, up to 3 hops:
+All 5 gmail agents read `llm=self.llm`, bound at **class-body** level:
 
-| Terminus | Count | % of factories |
-|---|---|---|
-| **`runtime_external`** | **4** | **80%** |
-| `static` | 1 | 20% |
+```python
+@CrewBase
+class GmailCrewAi():
+    llm = LLM(model="openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
-The chain in full, and it is worth reading end to end:
-
-```
-market_overview_agents.py:28   Agent(llm=PROJECT_LLM)     → imported
-config.py:176                  PROJECT_LLM = create_default_llm(...)   → factory_call
-config.py:124                  def create_default_llm(...): return LLM(model=get_env_var(model), …)
-config.py:115                  def get_env_var(v): value = os.getenv(v); return value   → runtime_external
+    @agent
+    def categorizer(self) -> Agent:
+        return Agent(config=self.agents_config['categorizer'],
+                     tools=[FileReadTool()], llm=self.llm)
 ```
 
-**Build the cross-module hop and the factory follower — two substantial
-resolver capabilities — and on this corpus you arrive at `os.getenv`.** The
-model string is not in the repository at any depth.
+This is **kwarg-level `self.<attr>` → class-body binding** — the exact shape I
+flagged as a coverage regression after trimming crewAI-examples. It had 8
+occurrences in the pre-trim tree, all in removed `flows/` projects, and **zero
+coverage in any fixture** afterwards. It is also the shape that broke the v1
+resolver, which classified all 8 as `unresolved` and understated reachability by
+33 points.
 
-This required one fix mid-build worth flagging: the first version of the factory
-follower only inspected `return` expressions, so `value = os.getenv(v); return
-value` scored `static`. Resolving a returned bare name against the function's own
-locals is what makes it `runtime_external` — and calling it static would have been
-exactly the over-claim of reachability the spec warns against, in the opposite
-direction.
-
----
-
-## The narrative questions, answered
-
-**Did the new repo move `local`?** No. **0 of 8**, matching 0 of 6 original and
-v1's 0 of 95. Across 103 agent sites now surveyed, not one kwarg reference
-resolves to a function-local variable. The deferred scope walker stays deferred —
-this is the third independent corpus to say so.
-
-**Did it move `factory_call`?** At agent sites, no (0). In the binding census,
-**yes, decisively**: 5 of 5 factories in the corpus are new-cohort. But the
-follow-through says the capability does not pay: 80% of them terminate in
-`os.getenv`.
-
-**Did it move `runtime_external`?** At agent sites, no — 0, because the runtime
-dependency is three hops away and v2 correctly declines to claim what it cannot
-see. In the factory census, yes: 4 of 5. The honest summary is that
-`runtime_external` is **reachable only by the resolver capabilities that would
-have to be built first**, which is itself the argument against building them.
-
-**Does anything argue for reordering resolver priorities?** Yes — one thing, and
-it is not what I expected:
-
-`imported` at **75% of new-cohort references** is now the single largest
-addressable category. Cross-module import following is the only capability the
-new corpus argues for, and it is cheap relative to factory-following (resolve a
-module path, re-run the existing module-scope pass). But the two latent chains it
-would recover both end in `os.getenv`. **The correct move is to follow the import
-one hop, discover the factory, and then stop and report `runtime_external` with
-evidence** — the three-state model already has the vocabulary for this, and it is
-what the C2 scanner already does correctly for `create_llm(...)`.
-
-Ranked, on 103 agent sites:
-
-1. **Cross-module import following, one hop, terminating honestly.** 6 of 8
-   new-cohort references; 0 original. Recovers the *shape* even when the value is
-   runtime.
-2. **Inheritance-aware `self.<attr>`.** The 2 `unresolved_local` are
-   `self.stocktwit_llm` / `self.technical_ind_llm`, bound in a **base class** via
-   `super().__init__(...)` — a construction shape no original corpus contained.
-   Small, cheap, and currently a silent miss.
-3. **Nothing else.** `local` 0/103, `argument_passed` 0/103, agent-site
-   `factory_call` 0/103.
+`crewai-gmail-automation` covers it again, at 5 sites. Across all six corpora,
+`self_attr` now splits **5 `class_body` / 2 `__init__`** — the class-body form is
+the majority, and it is back under test.
 
 ---
 
-## What else the new repo changed
+## It also validates the `runtime_external` boundary
 
-- **Kwarg surface is 3 wide**: `config` 8/8, `llm` 8/8, `verbose` 8/8. Nothing
-  else. Zero identity fields — a fourth corpus at 0% for `role`/`goal`/`backstory`.
-- **`config=` holds at 100%** — now 69/100/100/100/100% across five corpora.
-- **A construction surface not in the schema**: 6 of 8 agents are `@agent` in
-  `@CrewBase`; the other 2 are plain methods on an undecorated class that loads
-  its own YAML with `os.path.dirname(__file__)` — the `__file__`-relative config
-  base, distinct from both `self.agents_config` and `screenplay_writer`'s
-  `Path.cwd()`.
-- **`llm_shape`** is `name` ×6 / `attribute` ×2 — no calls, no constants. Fifth
-  corpus, fifth distribution.
+`LLM(model="openai/gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))` is
+classified `terminal_constructor`, not `runtime_external` — and that is the right
+call. The **model is a static literal**; only the API key is runtime. v2's
+`runtime_evidence` deliberately asks whether the value *is* runtime data, not
+whether it *contains* a runtime sub-expression. Had it done the latter, this
+constructor would have been written off as unreachable and a perfectly
+recoverable model string lost.
+
+`openai/gpt-4o-mini` is also the **first constant model string reachable from an
+agent site** since crewAI-examples' `llama3.1`, and the corpus-wide model list is
+now: `openai/gpt-4o-mini` ×6, `llama3.1` ×4, `gpt-4-turbo` ×2, plus
+`GPT-4o` ×2 on `Crew(manager_llm=)` (still flagged: not lowercase).
 
 ---
+
+## What did not move
+
+**`local`: 0 of 13 new, 0 of 6 original, 0 of 108 agent sites surveyed to date.**
+Fourth independent corpus addition, still zero. The deferred function-scope
+walker stays deferred; this is now about as settled as anything in the survey.
+
+**`factory_call` at agent sites: still 0.** The binding census is unchanged by
+the gmail repo — all 5 factories in the corpus remain AITradingCrew's, and 4 of 5
+still terminate in `os.getenv`. The gmail repo contributes 9 `terminal_constructor`
+bindings and no factories at all.
+
+**`argument_passed`: 0 across all six corpora.** Added in v2 as a distinct
+resolver capability; it has yet to fire once.
+
+**`config=`: 46 of 50 (92%)**, and 5/5 in the gmail repo via
+`self.agents_config[...]`. Sixth corpus, still the only universal kwarg.
+**Identity fields: 4 of 50 agents** carry all three — the gmail repo is the fifth
+corpus at 0%.
+
+---
+
+## Does anything reorder the resolver priorities?
+
+Marginally, and in the direction of doing *less*:
+
+1. **Class-body `self.<attr>` resolution just became the highest-value confirmed
+   capability.** 5 of 13 new-cohort references, majority of all `self_attr`
+   bindings, previously untested, and cheap — it is a lookup in the class body
+   the resolver already walks.
+2. **Cross-module import following drops in priority.** Last run it was 75% of
+   new-cohort references; with a second new repo it is 46%, all from one repo,
+   and both latent chains it would recover end in `os.getenv`. Still worth one
+   hop that terminates honestly, but no longer the headline.
+3. **Inheritance-aware `self.<attr>`** (AITradingCrew's 2 `unresolved_local`,
+   bound in a base class via `super().__init__`) is unchanged and still a silent
+   miss.
+4. **Nothing else.** `local` 0/108, `argument_passed` 0/108, agent-site
+   `factory_call` 0/108.
+
+---
+
+## Fixture recommendation
+
+`crewai-gmail-automation` is a better fixture than its size suggests: 8 `.py`
+files, 5 agents, an independent author, and it is the **only** corpus covering
+kwarg-level class-body binding. If the validation set takes one more repo, this
+is the one — it closes the coverage gap the crewAI-examples trim opened, at a
+fraction of the labelling cost of restoring `flows/email_auto_responder_flow`.
 
 ## Caveat
 
-One new repo, 8 agent sites, same author as the other four. The `local` result
-is now robust across 103 sites and three independent additions. The cohort
-divergence on `imported` (6/6 vs 0/8) is stark but rests on a single new corpus —
-it should be confirmed by a second `new` repo before it reorders a roadmap.
+Two new repos, 13 agent sites, one of them by an independent author. The `local`
+result is robust across 108 sites and four additions. The cohort story is now
+visibly unstable — it inverted on the second data point — so cohort-level claims
+should be treated as provisional until several more independent repos land.
