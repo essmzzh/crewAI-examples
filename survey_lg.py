@@ -477,7 +477,7 @@ def build_import_map(tree):
     `... as SG`, and `import langgraph` + `langgraph.graph.StateGraph(...)`. All
     Import nodes are walked, not only top-level ones.
     """
-    direct, modules, bound_names, origin = {}, {}, set(), {}
+    direct, modules, bound_names, origin, lookalikes = {}, {}, set(), {}, {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -499,7 +499,12 @@ def build_import_map(tree):
                 origin[local] = mod
                 if langgraph_module(mod) and alias.name in TARGETS:
                     direct[local] = (alias.name, mod)
-    return direct, modules, bound_names, origin
+                elif alias.name in TARGETS:
+                    # Same name, different package — e.g. create_react_agent from
+                    # langchain.agents.react.agent, which is NOT LangGraph's prebuilt.
+                    # A name-only matcher would count this as a LangGraph site.
+                    lookalikes[local] = (alias.name, mod)
+    return direct, modules, bound_names, origin, lookalikes
 
 
 def match_graph_callee(func, direct, modules):
@@ -558,7 +563,14 @@ def scan_file(path, root, units, stats, corpus, cohort):
         return [], []
     src_text = src.decode("utf-8", errors="replace")
 
-    direct, modules, imported_names, import_origin = build_import_map(tree)
+    direct, modules, imported_names, import_origin, lookalikes = build_import_map(tree)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                and node.func.id in lookalikes:
+            sym, mod = lookalikes[node.func.id]
+            stats["lookalike_sites"].append(
+                {"corpus": corpus, "file": rel, "line": node.lineno,
+                 "symbol": sym, "import_path": mod})
     if not direct and not modules:
         return [], []
 
@@ -674,21 +686,37 @@ def scan_file(path, root, units, stats, corpus, cohort):
             continue
         grow["node_count"] += 1
         nfunc, ncls, _ = enclosing(node, parents)
-        name_arg = node.args[0] if node.args else None
-        node_name = (name_arg.value if isinstance(name_arg, ast.Constant)
-                     and isinstance(name_arg.value, str) else None)
-        target = node.args[1] if len(node.args) > 1 else None
+        # LangGraph accepts BOTH add_node(name, target) and add_node(callable),
+        # the latter inferring the node name from the callable's __name__. The
+        # one-arg form is 40% of this corpus; assuming two args drops its target.
+        name_arg = target = None
+        if len(node.args) >= 2:
+            name_arg, target = node.args[0], node.args[1]
+        elif len(node.args) == 1:
+            only = node.args[0]
+            if isinstance(only, ast.Constant) and isinstance(only.value, str):
+                name_arg = only
+            else:
+                target = only
         if target is None:
             for kw in node.keywords:
-                if kw.arg in ("action", "node", "func"):
+                if kw.arg in ("action", "node", "func", "runnable"):
                     target = kw.value
                     break
+        if isinstance(name_arg, ast.Constant) and isinstance(name_arg.value, str):
+            node_name, node_name_source = name_arg.value, "explicit"
+        elif isinstance(target, ast.Name):
+            node_name, node_name_source = target.id, "inferred_from_callable"
+        elif isinstance(target, ast.Attribute):
+            node_name, node_name_source = target.attr, "inferred_from_callable"
+        else:
+            node_name, node_name_source = None, None
         nrow = {
             "corpus": corpus, "cohort": cohort, "repo": repo_for(rel, units),
             "file": rel, "line": node.lineno, "is_test": is_test_path(rel),
             "graph_file": grow["file"], "graph_line": grow["line"],
             "graph_kind": grow["kind"], "builder_expr": base,
-            "node_name": node_name,
+            "node_name": node_name, "node_name_source": node_name_source,
             "node_target_unparsed": unparse(target) if target is not None else None,
             "node_target_type": type(target).__name__ if target is not None else None,
             "scope_distance": scope_distance(gfunc, gcls, nfunc, ncls),
@@ -772,6 +800,18 @@ def write_aggregates(graphs, nodes, dialects, stats, label, path="aggregates.md"
     o.append("This is the LangGraph analog of a config dialect: it decides how much of "
              "the ecosystem each detection path covers. A scanner that only recognises "
              f"`create_react_agent` would see {pct(react, tot)} of this corpus.")
+    o.append("")
+
+    la = stats.get("lookalike_sites", [])
+    if la:
+        o.append("**Lookalike callees — same name, different package.** These call a "
+                 "name in the target set but the binding does not come from `langgraph.*`, "
+                 "so they are correctly excluded. A name-only matcher would count them "
+                 "as LangGraph sites and be wrong:")
+        o.append("")
+        table(o, ["Site", "Callee", "Actually imported from"],
+              [[f"{x['corpus']}/{x['file']}:{x['line']}", f"`{x['symbol']}`",
+                f"`{x['import_path']}`"] for x in la])
     o.append("")
 
     # 3 node-target reachability — the comparable table
@@ -941,7 +981,7 @@ def main():
         targets.append((cohort, p, os.path.basename(p.rstrip(os.sep))))
 
     stats = {"parse_failures": [], "read_failures": [], "py_files": 0,
-             "ipynb_files": 0, "files_with_binding": 0}
+             "ipynb_files": 0, "files_with_binding": 0, "lookalike_sites": []}
     graphs, nodes, dialects = [], [], []
     for cohort, root, corpus in targets:
         units = discover_repo_units(root)
